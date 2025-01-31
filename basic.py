@@ -9,6 +9,8 @@ from tensorflow.keras.layers import*
 import os
 from datetime import*
 import random
+from joblib import dump, load
+
 
 #connecting to mongodb
 
@@ -46,15 +48,38 @@ for key, value in new_data.items():
 
 print("Data inserted into MongoDB successfully.")'''
 #global babies
+scaler=None
+model=None
 model_path = "sales_model.h5"
+scaler_path = "scaler.pkl"
 
-def preprocess_data(df):
-    if "_id" in df.columns:
-        df.drop("_id", axis=1, inplace=True)
-    df.fillna(0, inplace=True)
-    X = df[["buy", "profit", "name", "time"]]
-    y = df["profit"]
-    return X, y
+def preprocess_data(data):
+    if not data:
+        print("No data in MongoDB!")
+        return None, None
+    extracted_data=[]    
+   #conversion to pandas dataframe
+    for record in data:
+      for key,value in record.items():
+        if key.startswith("item_") and isinstance(value, dict):
+            
+            if all(k in value for k in ["buy", "time", "profit", "name"]):
+
+                extracted_data.append(value)
+    if not extracted_data:
+        print("No valid data in MongoDB!")
+        return None, None,None            
+
+    df=pd.DataFrame(extracted_data)
+    required_columns = ["buy", "time", "profit", "name"]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        print(f"Missing columns: {', '.join(missing_columns)}")
+        return None, None       
+    
+    X=df[["buy", "time", "profit", "name"]]
+    y=df["profit"]
+    return df,X,y
 
 def build_nn_model(input_shape):
     model = Sequential([
@@ -71,48 +96,42 @@ def build_nn_model(input_shape):
 def train_initial_model():
     global model, scaler
 
-    # Fetch data from MongoDB
     data = list(collection.find())
-    df = pd.DataFrame(data)
+    df,X, y = preprocess_data(data)
+    if X is None or y is None:
+        print("No training data available.")
+        return
 
-    # Preprocess data
-    X, y = preprocess_data(df)
-
-    # Scale features
+    # Save scaler
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
+    
 
-    # Build and train the model
+    # Build and train model
     model = build_nn_model(input_shape=X_scaled.shape[1])
     model.fit(X_scaled, y, epochs=50, batch_size=16, verbose=1)
-
-    # Save the model and scaler
-    model.save(model_path)
-    print("Model trained and saved!")
+    model.save(model_path,save_format="tf")
+    dump(scaler, "scaler.pkl")
+    print("Model and scaler saved!")
 
 def predict_sales():
     global model, scaler
 
-    # Fetch data from MongoDB
     data = list(collection.find())
-    df = pd.DataFrame(data)
+    df, X, y = preprocess_data(data)  # Update this line
 
-    # Preprocess data
-    X, y = preprocess_data(df)
+    # Load scaler if missing
+    if scaler is None:
+        scaler = load(scaler_path)
+
     X_scaled = scaler.transform(X)
+    predictions = model.predict(X_scaled).flatten()
+    total_sales = predictions.sum()
+    shelf_space = (predictions / total_sales) * 100
 
-    # Predict sales
-    predictions = model.predict(X_scaled)
-    total_sales = sum(predictions)
-
-    # Allocate shelf space percentages
-    shelf_space = [(pred / total_sales) * 100 for pred in predictions]
-
-    # Combine predictions and shelf space allocation
     results = df.copy()
     results["predicted_sales"] = predictions
     results["shelf_space_percentage"] = shelf_space
-
     return results.to_dict(orient="records")
 
 def add_data(new_data):
@@ -120,16 +139,23 @@ def add_data(new_data):
     return "Data added successfully!"
 
 def retrain_model():
-    global model, scaler
+    global model,scaler
+    if model is None or scaler is None:
+        if os.path.exists(model_path) and os.path.exists("scaler.pkl"):
+            model=tf.keras.models.load_model(model_path,custom_objects={"mse":tf.keras.losses.MeanSquaredError()})
+            scaler=load("scaler.pkl")
+            model.compile(optimizer='adam', loss='mse', metrics=['mae'])
+        else:
+            return "Error:Model or scaler not found .Train the model first."    
     new_data = list(collection.find())
-    df = pd.DataFrame(new_data)
+    df, X, y = preprocess_data(new_data)  # Use updated preprocess_data
 
-    # Preprocess the new data
-    X, y = preprocess_data(df)
+    # Ensure scaler exists
+    if X is None or y is None:
+        return "Error: No valid data for retraining."
+        
+
     X_scaled = scaler.transform(X)
-
-    # Incrementally train the model with new data
     model.fit(X_scaled, y, epochs=5, batch_size=16, verbose=1)
     model.save(model_path)
-
     return "Model retrained successfully!"
