@@ -9,29 +9,29 @@ tf.config.run_functions_eagerly(True)
 
 app = Flask(__name__)
 
-# Check if model exists, otherwise train it
+# If our model doesn't exist, we play scientist and create it from scratch!
 if not os.path.exists(model_path) or not os.path.exists("scaler.pkl"):
-    print("Training model from scratch...")
+    print("Oops, no model found! Time to train one from scratch...")
     train_initial_model()
 else:
-    print("Loading existing model and scaler")
+    print("Good news! Found an existing model. Loading it like a boss...")
     
-    model = load_model(model_path,custom_objects={"mse":tf.keras.losses.MeanSquaredError()})
+    model = load_model(model_path, custom_objects={"mse": tf.keras.losses.MeanSquaredError()})
     scaler = load("scaler.pkl")
     from basic import model as basic_model, scaler as basic_scaler
     basic_model = model
     basic_scaler = scaler
 
-# Flask endpoint to train the model
+# Endpoint to train the model - because even AI needs a workout
 @app.route("/train", methods=["POST"])
 def train():
     try:
         train_initial_model()
-        return jsonify({"message": "Model trained successfully!"}), 200
+        return jsonify({"message": "The AI has been trained. It now knows more than before!"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Flask endpoint to predict sales and allocate shelf space
+# Endpoint to predict sales and decide how much shelf space things deserve
 @app.route("/predict", methods=["GET"])
 def predict():
     try:
@@ -40,7 +40,7 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Flask endpoint to add new data
+# Endpoint to add new data - because fresh data is always in style
 @app.route("/add-data", methods=["POST"])
 def add_new_data():
     try:
@@ -50,7 +50,7 @@ def add_new_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Flask endpoint to retrain the model incrementally
+# Endpoint to retrain the model - because AI forgets things too
 @app.route("/retrain", methods=["POST"])
 def retrain():
     try:
@@ -59,6 +59,7 @@ def retrain():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Run the Flask app
+# Running the Flask app - because somebody's gotta do it
 if __name__ == "__main__":
+    print("Starting the Flask app... Hold on to your hats!")
     app.run(debug=True)
