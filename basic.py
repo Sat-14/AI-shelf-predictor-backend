@@ -47,7 +47,7 @@ for key, value in new_data.items():
     collection.insert_one({key: value})
 
 print("Data inserted into MongoDB successfully.")'''
-#global babies
+# Global variables, because sometimes we just need a VIP section
 scaler=None
 model=None
 model_path = "sales_model.h5"
