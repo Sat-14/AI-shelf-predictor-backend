@@ -10,7 +10,8 @@ import os
 from datetime import*
 import random
 from joblib import dump, load
-
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 #connecting to mongodb
 
@@ -47,7 +48,7 @@ for key, value in new_data.items():
     collection.insert_one({key: value})
 
 print("Data inserted into MongoDB successfully.")'''
-# Global variables, because sometimes we just need a VIP section
+#global babies
 scaler=None
 model=None
 model_path = "sales_model.h5"
@@ -159,3 +160,89 @@ def retrain_model():
     model.fit(X_scaled, y, epochs=5, batch_size=16, verbose=1)
     model.save(model_path)
     return "Model retrained successfully!"
+
+
+
+    
+
+def extract_item_data():
+    items = []
+    for doc in collection.find():
+        for key, value in doc.items():
+            if key.startswith('item_') and isinstance(value, dict) and 'name' in value:
+                items.append({
+                    'name': value['name'],
+                    'profit': value.get('profit', 0),
+                    'time': value.get('time', 0)
+                })
+    return items
+
+
+def extract_item_data():
+    items = []
+    for doc in collection.find():
+        for key, value in doc.items():
+            if key.startswith('item_') and isinstance(value, dict) and 'name' in value:
+                items.append({
+                    'name': value['name'],
+                    'profit': value.get('profit', 0),
+                    'time': value.get('time', 0)
+                })
+    return items
+
+
+    
+def generate_profit_by_item_graph(items):
+    # Aggregate profit by item
+    item_profit = {}
+    for item in items:
+        item_profit[item['name']] = item_profit.get(item['name'], 0) + item['profit']
+
+    # Extract items and profits
+    items_list = list(item_profit.keys())
+    profits = list(item_profit.values())
+
+    # Plot
+    plt.figure(figsize=(10, 5))
+    sns.barplot(x=items_list, y=profits, palette='viridis')
+    plt.title('Profit by Item', fontsize=16)
+    plt.xlabel('Item', fontsize=14)
+    plt.ylabel('Total Profit', fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.tight_layout()
+
+    # Save the plot to a BytesIO object
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    plt.close()
+    return img
+
+def generate_frequency_of_sale_graph(items):
+    # Aggregate frequency of sale by item
+    item_frequency = {}
+    for item in items:
+        item_frequency[item['name']] = item_frequency.get(item['name'], 0) + 1
+
+    # Extract items and frequencies
+    items_list = list(item_frequency.keys())
+    frequencies = list(item_frequency.values())
+
+    # Plot
+    plt.figure(figsize=(10, 5))
+    sns.barplot(x=items_list, y=frequencies, palette='coolwarm')
+    plt.title('Frequency of Sale by Item', fontsize=16)
+    plt.xlabel('Item', fontsize=14)
+    plt.ylabel('Frequency of Sale', fontsize=14)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    plt.tight_layout()
+
+    # Save the plot to a BytesIO object
+    img = io.BytesIO()
+    plt.savefig(img, format='png')
+    img.seek(0)
+    plt.close()
+    return img
+
