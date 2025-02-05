@@ -9,29 +9,29 @@ tf.config.run_functions_eagerly(True)
 
 app = Flask(__name__)
 
-# If our model doesn't exist, we play scientist and create it from scratch!
+# Check if model exists, otherwise train it
 if not os.path.exists(model_path) or not os.path.exists("scaler.pkl"):
-    print("Oops, no model found! Time to train one from scratch...")
+    print("Training model from scratch...")
     train_initial_model()
 else:
-    print("Good news! Found an existing model. Loading it like a boss...")
+    print("Loading existing model and scaler")
     
-    model = load_model(model_path, custom_objects={"mse": tf.keras.losses.MeanSquaredError()})
+    model = load_model(model_path,custom_objects={"mse":tf.keras.losses.MeanSquaredError()})
     scaler = load("scaler.pkl")
     from basic import model as basic_model, scaler as basic_scaler
     basic_model = model
     basic_scaler = scaler
 
-# Endpoint to train the model - because even AI needs a workout
+# Flask endpoint to train the model
 @app.route("/train", methods=["POST"])
 def train():
     try:
         train_initial_model()
-        return jsonify({"message": "The AI has been trained. It now knows more than before!"}), 200
+        return jsonify({"message": "Model trained successfully!"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Endpoint to predict sales and decide how much shelf space things deserve
+# Flask endpoint to predict sales and allocate shelf space
 @app.route("/predict", methods=["GET"])
 def predict():
     try:
@@ -40,7 +40,7 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Endpoint to add new data - because fresh data is always in style
+# Flask endpoint to add new data
 @app.route("/add-data", methods=["POST"])
 def add_new_data():
     try:
@@ -50,7 +50,7 @@ def add_new_data():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Endpoint to retrain the model - because AI forgets things too
+# Flask endpoint to retrain the model incrementally
 @app.route("/retrain", methods=["POST"])
 def retrain():
     try:
@@ -58,8 +58,25 @@ def retrain():
         return jsonify({"message": message}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+@app.route('/profit_by_item', methods=['GET'])
+def profit_by_item():
+  try:  
+    items = extract_item_data()
+    img = generate_profit_by_item_graph(items)
+    return send_file(img, mimetype='image/png')
+  except Exception as e:
+        return jsonify({"error": str(e)}), 500  
 
-# Running the Flask app - because somebody's gotta do it
+
+@app.route('/frequency_of_sale', methods=['GET'])
+def frequency_of_sale():
+   try: 
+    items = extract_item_data()
+    img = generate_frequency_of_sale_graph(items)
+    return send_file(img, mimetype='image/png')
+   except Exception as e:
+        return jsonify({"error": str(e)}), 500          
+
+# Run the Flask app
 if __name__ == "__main__":
-    print("Starting the Flask app... Hold on to your hats!")
     app.run(debug=True)
